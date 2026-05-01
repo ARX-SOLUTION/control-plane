@@ -180,27 +180,51 @@ Don't propose any of these unless I explicitly ask:
 
 ## Current implementation status
 
-Implemented:
-
+✅ **Completed (Phase 1 - Core Foundation):**
 - Project skeleton (NestJS + pnpm)
 - `ConfigModule` with zod-validated env
-- `PersistenceModule` with Drizzle, single `users` table
-- `AuthModule` with login / logout / me, session in Redis, argon2id, session fixation protection, admin bootstrap from `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+- `PersistenceModule` with Drizzle, dual DB setup
+- `AuthModule` with login/logout/me, session in Redis, argon2id, admin bootstrap
+- `CryptoModule` with AES-256-GCM envelope encryption
+- `AuditModule` with separate DB, INSERT-only role, log sanitization
 - `docker-compose.dev.yml` for local Postgres + Redis
-- Initial migration creating `users`
+- Initial migrations for users and audit tables
 
-Next planned modules, in order:
+🚧 **Next planned modules (Phase 2 - Project Management):**
+1. `projects` + `environments` + `env-vars` (encrypted secrets, versioning)
+2. `infrastructure/docker` + `infrastructure/git` (container + repo management)
 
-1. `crypto` (envelope encryption) + `audit` (separate DB, insert-only)
-2. `projects` + `environments` + `env-vars`
-3. `infrastructure/docker`, `infrastructure/git`
-4. `deployments` (state machine + BullMQ)
-5. `infrastructure/caddy` + `domains` + `infrastructure/cloudflare`
-6. `databases` (PG/Redis provisioning, user/password management)
-7. `logs` (Loki integration, WS streaming)
-8. `monitoring` (Prometheus, alert webhook)
-9. OpenTelemetry wiring
-10. Production Dockerfile + compose, migration job, backups
+**Phase 3 - Deployment Pipeline:**
+3. `deployments` (state machine + BullMQ, blue-green orchestration)
+4. `infrastructure/caddy` + `domains` + `infrastructure/cloudflare` (reverse proxy + DNS)
+
+**Phase 4 - Infrastructure Services:**
+5. `databases` (PG/Redis provisioning, user/password management)
+6. `logs` (Loki integration, WS streaming)
+7. `monitoring` (Prometheus, alert webhook)
+
+**Phase 5 - Production Ready:**
+8. OpenTelemetry wiring, performance optimization
+9. Production Dockerfile + compose, migration job, backups
+
+## Git Workflow
+
+**Per-phase commits:** Each major module/phase gets committed separately with descriptive messages following pattern: `feat: implement <module-name> - <brief-description>`
+
+**Commit strategy:**
+- Atomic commits per logical feature
+- Test build success before commit
+- Include audit trail in commit metadata
+- Push after each phase completion
+
+## Obsidian Wiki
+
+Shared knowledge base: `~/Documents/claude-node/`
+
+- Entity page: `[[entities/control-plane]]` — update when architecture changes
+- Memory dir: `~/Documents/claude-node/memory/`
+- Link to: `[[entities/NestJS]]`, `[[entities/PostgreSQL]]`, `[[entities/BullMQ]]`, `[[entities/Redis]]`, `[[entities/Docker]]`
+- Concepts: `[[concepts/Blue-Green-Deployment]]`, `[[concepts/Envelope-Encryption]]`, `[[concepts/State-Machine]]`
 
 ## How to work with me on this project
 
