@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add zod drizzle-orm pg @types/pg argon2 express-session connect-redis ioredis @types/express-session helmet cookie-parser @types/cookie-parser bullmq amqplib @types/amqplib dockerode @types/dockerode simple-git @opentelemetry/sdk-node @opentelemetry/instrumentation-http @opentelemetry/instrumentation-pg @opentelemetry/instrumentation-redis @opentelemetry/instrumentation-ioredis @opentelemetry/instrumentation-amqplib)",
+      "Bash(pnpm add -D drizzle-kit dotenv)",
+      "Bash(pnpm add postgres)",
+      "Bash(mkdir -p src/core/crypto src/core/audit)",
+      "Bash(touch src/core/crypto/crypto.module.ts src/core/crypto/crypto.service.ts src/core/crypto/types.ts)",
+      "Bash(pnpm run lint)",
+      "Bash(pnpm run build)",
+      "Bash(find src/modules -name \"*.service.ts\" -exec sed -i '' 's/actorUserId:/actor_user_id:/g' {} ;)",
+      "Bash(find src/modules -name \"*.service.ts\" -exec sed -i '' 's/resourceType:/resource_type:/g' {} ;)",
+      "Bash(find src/modules -name \"*.service.ts\" -exec sed -i '' 's/resourceId:/resource_id:/g' {} ;)",
+      "Bash(git add src/core/crypto/ src/core/audit/ src/infrastructure/persistence/audit.schema.ts drizzle.config.audit.ts)",
+      "Bash(git add src/infrastructure/persistence/persistence.module.ts src/core/config/env.schema.ts .env.example)",
+      "Bash(git add src/app.module.ts package.json)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: implement crypto and audit core modules\n\n- Add CryptoService with AES-256-GCM envelope encryption\n- Add AuditService with separate database for immutable logs  \n- Configure dual DB connections (main + audit)\n- Add MASTER_KEY and AUDIT_DATABASE_URL env validation\n- Include audit migration scripts and config\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git add CLAUDE.md)",
+      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: update project status and add git workflow\n\n- Mark Phase 1 (Core Foundation) as completed\n- Document crypto + audit module implementation\n- Add structured phase-based development approach\n- Define commit strategy and workflow patterns\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push origin main)",
+      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: add mandatory Obsidian memory system requirement\n\n- Make Obsidian integration non-negotiable requirement\n- Define required actions for every Claude session\n- Specify entity and concept cross-linking obligations\n- Ensure persistent knowledge management compliance\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Read(//Users/admin/Documents/claude-node/**)",
+      "Bash(find \"/Users/admin/Documents/claude-node/wiki/entities\" -name \"*.md\" -exec grep -l -i \"docker\\|redis\\|drizzle\\|argon2\\|zod\" {} ;)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
