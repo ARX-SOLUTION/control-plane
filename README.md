@@ -1,98 +1,324 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Control Plane
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Self-hosted single-server mini-PaaS. One admin manages projects, deployments, databases, env vars, domains, logs, and metrics — a stripped-down Coolify/Dokploy for one operator and one host.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech Stack
 
-## Description
+| Layer | Choice |
+|---|---|
+| Runtime | Node.js 20+, pnpm |
+| Framework | NestJS 11+ |
+| Database | PostgreSQL 16 (main + audit) |
+| ORM | Drizzle |
+| Queue / Cache | Redis 7 + BullMQ |
+| Event bus | RabbitMQ |
+| Reverse proxy | Caddy 2 |
+| DNS | Cloudflare API |
+| Containers | Docker (dockerode) |
+| Tracing | OpenTelemetry → OTLP |
+| Logs | Loki |
+| Metrics | Prometheus |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Features
 
-## Project setup
+- **Projects** — CRUD, GitHub URL, build/start commands, health check config
+- **Environments** — dev / staging / prod per project
+- **Env vars** — AES-256-GCM envelope-encrypted, versioned, reveal endpoint
+- **Deployments** — blue-green zero-downtime, full state machine via BullMQ
+- **Databases** — provision PostgreSQL / Redis containers per project (encrypted credentials)
+- **Domains** — Cloudflare DNS A record + Caddy reverse proxy route
+- **VCS webhooks** — GitHub (HMAC-SHA256) and GitLab (token) push → auto-deploy
+- **Logs** — Loki query proxy + WebSocket live tail
+- **Monitoring** — Prometheus PromQL proxy + Alertmanager webhook receiver
+- **Notifications** — email (SMTP), Telegram, generic webhook via RabbitMQ events
+- **Backup** — `pg_dump` on demand, stored in `/data/backups/`
+- **Grafana** — iframe panel URL config endpoint
+- **Tracing** — OpenTelemetry SDK with gRPC OTLP export
+- **Rate limiting** — Redis sliding window on login (5 req / 15 min / IP+email)
+- **Audit log** — separate Postgres DB, INSERT-only role
 
-```bash
-$ pnpm install
-```
+---
 
-## Compile and run the project
+## Development Setup
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
-```
-
-## Run tests
+### 1. Install dependencies
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2. Start infrastructure
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Starts PostgreSQL (main + audit), Redis, and RabbitMQ locally.
 
-## Resources
+### 3. Configure environment
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+cp .env.prod.example .env
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Minimum required values for development:
 
-## Support
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/control_plane
+AUDIT_DATABASE_URL=postgresql://postgres:postgres@localhost:5433/control_plane_audit
+REDIS_URL=redis://localhost:6379
+RABBITMQ_URL=amqp://localhost:5672
+SESSION_SECRET=dev-secret-at-least-32-characters-xx
+MASTER_KEY=0000000000000000000000000000000000000000000000000000000000000001
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=changeme123
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### 4. Run migrations
 
-## Stay in touch
+```bash
+pnpm db:migrate
+pnpm db:migrate:audit
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### 5. Start the app
 
-## License
+```bash
+pnpm start:dev
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+API: `http://localhost:3000/api`
+
+---
+
+## Production Deployment
+
+### Prerequisites
+
+- A server with Docker installed (`curl -fsSL https://get.docker.com | sh`)
+- A domain pointing to the server's IP (A record in DNS)
+- Ports 80 and 443 open
+
+### 1. Clone and configure
+
+```bash
+git clone <repo-url> control-plane && cd control-plane
+cp .env.prod.example .env.prod
+```
+
+Fill in all `CHANGE_ME` values:
+
+| Variable | How to generate |
+|---|---|
+| `SESSION_SECRET` | `openssl rand -hex 32` |
+| `MASTER_KEY` | `openssl rand -hex 32` |
+| `POSTGRES_PASSWORD` | strong random password |
+| `POSTGRES_AUDIT_PASSWORD` | strong random password |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | first-time login credentials |
+| `SERVER_IP` | server's public IP |
+| `CONTROL_PLANE_DOMAIN` | e.g. `cp.example.com` |
+| `ACME_EMAIL` | email for Let's Encrypt TLS |
+
+### 2. Deploy
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+What happens on first start:
+1. PostgreSQL (main + audit) starts and becomes healthy
+2. Migration container applies all pending migrations, then exits
+3. App starts (waits for migrations to complete)
+4. Caddy provisions a TLS certificate automatically
+
+API: `https://cp.example.com/api`
+
+### 3. First login
+
+```bash
+curl -c cookies.txt -X POST https://cp.example.com/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"your-password"}'
+```
+
+> **Important:** Back up `MASTER_KEY` somewhere safe. Losing it makes all encrypted secrets (env vars, DB passwords, webhook secrets) unrecoverable.
+
+---
+
+## Scripts
+
+```bash
+pnpm start:dev          # development with hot-reload
+pnpm build              # compile TypeScript → dist/
+
+pnpm db:generate        # generate migration from schema changes (main DB)
+pnpm db:generate:audit  # generate migration (audit DB)
+pnpm db:migrate         # apply migrations (main DB)
+pnpm db:migrate:audit   # apply migrations (audit DB)
+pnpm db:studio          # Drizzle Studio GUI (main DB)
+```
+
+---
+
+## API Reference
+
+All endpoints require a valid session cookie except VCS webhooks and the Alertmanager webhook.
+
+### Auth
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/api/auth/login` | Rate-limited: 5 attempts / 15 min / IP+email |
+| `POST` | `/api/auth/logout` | |
+| `GET` | `/api/auth/me` | |
+
+### Projects
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/projects` |
+| `POST` | `/api/projects` |
+| `GET` | `/api/projects/:id` |
+| `PATCH` | `/api/projects/:id` |
+| `DELETE` | `/api/projects/:id` |
+
+### Environments
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/environments?projectId=` |
+| `POST` | `/api/environments` |
+| `DELETE` | `/api/environments/:id` |
+
+### Env Vars
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/api/env-vars?environmentId=` | Values hidden |
+| `POST` | `/api/env-vars` | Create or update |
+| `POST` | `/api/env-vars/:id/reveal` | Decrypt and return plaintext |
+| `DELETE` | `/api/env-vars/:id` | |
+
+### Deployments
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/deployments?environmentId=` |
+| `POST` | `/api/deployments` |
+| `GET` | `/api/deployments/:id` |
+| `POST` | `/api/deployments/:id/cancel` |
+
+**States:** `pending → cloning → building → starting → health_check → switching → success / failed / rolled_back`
+
+### Databases
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/api/databases` | Provision a PG or Redis container |
+| `GET` | `/api/databases?projectId=` | |
+| `GET` | `/api/databases/:id` | |
+| `POST` | `/api/databases/:id/connection-string` | Decrypted connection URL |
+| `DELETE` | `/api/databases/:id` | Stops and removes the container |
+
+### Domains
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/api/domains` | Creates Cloudflare A record + Caddy route |
+| `GET` | `/api/domains?environmentId=` | |
+| `DELETE` | `/api/domains/:id` | Removes DNS record + Caddy route |
+
+### VCS Webhooks
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/api/vcs/:id/webhook-secret` | Session | Generate / rotate secret (shown once) |
+| `DELETE` | `/api/vcs/:id/webhook-secret` | Session | Revoke |
+| `GET` | `/api/vcs/:id/branches` | Session | List remote branches |
+| `POST` | `/api/vcs/webhook/github/:id` | HMAC-SHA256 | Push → auto-deploy |
+| `POST` | `/api/vcs/webhook/gitlab/:id` | X-Gitlab-Token | Push → auto-deploy |
+
+**GitHub webhook setup:**
+1. `POST /api/vcs/:projectId/webhook-secret` — save the returned secret
+2. GitHub repo → Settings → Webhooks → Add webhook:
+   - Payload URL: `https://cp.example.com/api/vcs/webhook/github/:projectId`
+   - Content type: `application/json`
+   - Secret: paste from step 1
+   - Events: **Just the push event**
+
+### Logs
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/logs?query={app="my-app"}&start=&end=&limit=100` |
+| `WS` | `/api/logs/stream` — send `{"type":"subscribe","data":{"query":"...","start":"..."}}` |
+
+### Monitoring
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/api/monitoring/query?query=up` | Prometheus instant query |
+| `GET` | `/api/monitoring/query_range?query=up&start=&end=&step=60s` | Range query |
+| `POST` | `/api/monitoring/webhook` | Alertmanager receiver (no auth) |
+
+### Backup
+
+| Method | Path |
+|---|---|
+| `POST` | `/api/backup/trigger` |
+| `GET` | `/api/backup` |
+| `DELETE` | `/api/backup/:name` |
+
+### Grafana
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/grafana/config` |
+| `GET` | `/api/grafana/panel?dashboard=abc123&panelId=5` |
+
+### Notifications
+
+| Method | Path |
+|---|---|
+| `POST` | `/api/notifications/test` |
+
+---
+
+## Architecture
+
+```
+Internet
+   │
+   ▼
+Caddy (:80/:443)
+   │
+   ├─► /api/*  →  NestJS (:3000)
+   │               ├─ PostgreSQL  (main + audit)
+   │               ├─ Redis       (sessions + BullMQ)
+   │               ├─ RabbitMQ   (deployment events → notifications)
+   │               ├─ Docker socket
+   │               └─ Loki / Prometheus
+   │
+   └─► <subdomain>.example.com  →  managed project containers
+```
+
+**Docker networks:**
+- `cp_internal` — PostgreSQL, Redis, RabbitMQ, NestJS (isolated, no outbound internet)
+- `cp_ingress` — Caddy + NestJS + project public containers
+- `proj_<id>_net` — per-project isolation; managed DB containers only
+
+---
+
+## Security
+
+- Session cookies: `HttpOnly`, `SameSite=strict`, signed with `SESSION_SECRET`
+- Secrets encrypted with AES-256-GCM (per-secret DEK wrapped with master key)
+- Audit DB has an INSERT-only role — records cannot be modified or deleted after the fact
+- Rate limiting on login prevents brute-force (5 attempts / 15 min / IP+email)
+- Docker socket is mounted into the app container — equivalent to root access on the host
+
+---
+
+## Environment Variables
+
+See [`.env.prod.example`](.env.prod.example) for the full annotated list.

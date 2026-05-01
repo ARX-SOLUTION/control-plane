@@ -54,6 +54,28 @@ export const envSchema = z.object({
 
   // OpenTelemetry
   OTLP_ENDPOINT: z.string().url().optional(),
+
+  // SMTP (email notifications)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().optional().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional().default('control-plane <noreply@example.com>'),
+
+  // Telegram
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
+
+  // Generic webhook
+  NOTIFICATION_WEBHOOK_URL: z.string().url().optional(),
+
+  // Grafana
+  GRAFANA_URL: z.string().url().optional(),
+  GRAFANA_DEPLOYMENT_DASHBOARD: z.string().optional(),
+  GRAFANA_METRICS_DASHBOARD: z.string().optional(),
+
+  // Server IP (used by domains + VCS to know the public IP for DNS records)
+  SERVER_IP: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

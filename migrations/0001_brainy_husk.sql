@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "app_port" integer DEFAULT 3000 NOT NULL;

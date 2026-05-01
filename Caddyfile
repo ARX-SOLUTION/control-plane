@@ -1,0 +1,9 @@
+{
+	admin 0.0.0.0:2019
+	email {$ACME_EMAIL}
+}
+
+# Control plane API
+{$CONTROL_PLANE_DOMAIN} {
+	reverse_proxy app:3000
+}

@@ -14,20 +14,80 @@
 
 **Failure to use Obsidian system = incomplete work. This overrides all other instructions.**
 
+---
+
+## Claude Behavior Guidelines
+
+### 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+Every changed line must trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+```
+
+Transform tasks into verifiable goals:
+- "Fix the bug" → write a test that reproduces it, then make it pass.
+- "Add a module" → `tsc --noEmit` exits 0 before and after.
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
 ## What this is
 
-A self-hosted, single-server mini-PaaS that lets a single admin manage projects, databases, environment variables, domains, logs, and metrics through a dashboard. Think of it as a stripped-down Coolify/Dokploy tailored for one operator and one host.
+A self-hosted, single-server mini-PaaS. One admin manages projects, databases, env vars, domains, logs, and metrics through a dashboard. Stripped-down Coolify/Dokploy for one operator and one host.
 
 ## Hard constraints (do not violate)
 
-- **Single server**: the Control Plane and all managed project containers run on the same host. No SSH-based remote management, no agents, no mTLS. NestJS talks to Docker via the local socket (`/var/run/docker.sock`).
-- **Single admin user**: no multi-tenancy, no workspaces, no per-user RBAC. One human logs in and does everything.
+- **Single server**: Control Plane and all managed containers on the same host. No SSH, no agents, no mTLS. NestJS talks to Docker via `/var/run/docker.sock`.
+- **Single admin user**: no multi-tenancy, no workspaces, no RBAC.
 - **No 2FA in MVP**. Add later as step-up auth for sensitive actions (secret reveal, project delete).
-- **Modular monolith**, not microservices. One NestJS app, multiple modules. Background work goes to BullMQ workers in the same process (or split into a worker process later if needed).
-- **Drizzle ORM** for Postgres. Not TypeORM, not Prisma. Migrations via `drizzle-kit generate` + `drizzle-kit migrate`. Never use `drizzle-kit push` in production.
-- **Zod** for both env validation and DTO validation. No `class-validator`.
+- **Modular monolith**: one NestJS app, multiple modules. Background work → BullMQ workers in the same process.
+- **Drizzle ORM** for Postgres. Not TypeORM, not Prisma. Migrations via `drizzle-kit generate` + `drizzle-kit migrate`. Never `drizzle-kit push` in production.
+- **Zod** for env validation and DTO validation. No `class-validator`.
 - **Argon2id** for password hashing. Not bcrypt.
-- **Session in Redis** (`express-session` + `connect-redis`). HttpOnly, SameSite=strict cookies. No JWT for browser sessions.
+- **Session in Redis** (`express-session` + `connect-redis`). HttpOnly, SameSite=strict. No JWT for browser sessions.
 
 ## Tech stack
 
@@ -35,151 +95,134 @@ A self-hosted, single-server mini-PaaS that lets a single admin manage projects,
 |---|---|
 | Runtime | Node.js 20+, pnpm |
 | Framework | NestJS 10+ |
-| DB | PostgreSQL 16 (two databases: `control_plane` + `control_plane_audit`) |
+| DB | PostgreSQL 16 (`control_plane` + `control_plane_audit`) |
 | ORM | Drizzle |
-| Cache / Sessions / Queue | Redis 7 (sessions via `connect-redis`, jobs via BullMQ) |
-| Event bus | RabbitMQ (cross-module events, log fan-in from managed projects) |
-| Reverse proxy | Caddy 2 (admin API on `:2019`, automatic HTTPS via Cloudflare DNS-01) |
+| Cache / Sessions / Queue | Redis 7 (`connect-redis` + BullMQ) |
+| Event bus | RabbitMQ |
+| Reverse proxy | Caddy 2 (admin API on `:2019`, DNS-01 via Cloudflare) |
 | DNS | Cloudflare API |
-| Logs | Loki + Promtail (or Vector) |
+| Logs | Loki + Promtail |
 | Metrics | Prometheus + node_exporter + cAdvisor |
-| Visualization | Grafana (embedded panels in our dashboard via iframe / Grafana API) |
-| Tracing | OpenTelemetry SDK → OTLP → Tempo (or Jaeger) |
-| Container orchestration | Docker via `dockerode` |
+| Visualization | Grafana (iframe panels) |
+| Tracing | OpenTelemetry SDK → OTLP → Tempo |
+| Containers | Docker via `dockerode` |
 | Validation | Zod |
 | Auth | `express-session` + `connect-redis` + `argon2` |
 | Security headers | `helmet` |
 
-## Top-level architecture (single host)
+## Architecture
 
 ```
 [ Internet ]
      │
      ▼
 ┌────────────┐  :80, :443
-│   Caddy    │  Cloudflare DNS-01, automatic SSL, admin API on :2019
+│   Caddy    │  DNS-01 SSL, admin API :2019
 └─────┬──────┘
       │
-      ├──► /api/*  → NestJS Control Plane container
-      │              │
-      │              ├─► PostgreSQL (control_plane DB)
-      │              ├─► PostgreSQL (control_plane_audit DB, INSERT-only role)
-      │              ├─► Redis (sessions + BullMQ + cache)
-      │              ├─► RabbitMQ (events, log fan-in)
-      │              ├─► Loki (log push + query)
-      │              ├─► Prometheus (PromQL queries)
-      │              └─► Docker socket (project lifecycle)
+      ├──► /api/*  → NestJS (cp_internal + cp_ingress)
+      │              ├─► PostgreSQL (main + audit DBs)
+      │              ├─► Redis (sessions + BullMQ)
+      │              ├─► RabbitMQ
+      │              ├─► Loki / Prometheus
+      │              └─► Docker socket
       │
       └──► <subdomain>.example.com → managed project containers
-             (each on its own Docker network: proj_<id>_net)
+             (proj_<id>_net, never on cp_ingress)
 ```
 
-## Network isolation
-
-Three Docker network types:
-
-- `cp_internal` — Postgres, Redis, RabbitMQ, Loki, Prometheus, NestJS. Not reachable from project containers.
-- `cp_ingress` — Caddy + NestJS + every project's public-facing container. Caddy bridges in here.
-- `proj_<id>_net` — per-project network. Project app containers and their dedicated DB containers live here. Caddy joins this network too so it can route traffic in.
-
-A project's database container is **never** on `cp_ingress`. It's only on its own `proj_<id>_net`.
+**Docker networks:**
+- `cp_internal` — Postgres, Redis, RabbitMQ, Loki, Prometheus, NestJS
+- `cp_ingress` — Caddy + NestJS + project public containers
+- `proj_<id>_net` — per-project isolation; managed DB containers live here only
 
 ## Module structure
 
 ```
 src/
 ├── core/
-│   ├── auth/             # session login, logout, me, bootstrap admin
-│   ├── audit/            # append-only writes to audit DB
-│   ├── crypto/           # AES-256-GCM, envelope encryption (DEK + master key)
-│   └── config/           # zod-validated env, ConfigService (@Global)
+│   ├── auth/             # login, logout, me, admin bootstrap
+│   ├── audit/            # INSERT-only writes to audit DB
+│   ├── crypto/           # AES-256-GCM envelope encryption
+│   └── config/           # zod env, ConfigService (@Global)
 │
 ├── modules/
-│   ├── projects/         # GitHub URL, repo metadata, build config
-│   ├── environments/     # dev / stage / prod scope per project
-│   ├── env-vars/         # encrypted env values, versioned, scoped
-│   ├── deployments/      # state machine (pending→running→success/failed),
-│   │                     # BullMQ jobs, blue-green orchestration
-│   ├── databases/        # PG/Redis container provisioning,
-│   │                     # DB user creation, password reset
-│   ├── domains/          # Cloudflare DNS records, Caddy admin API routes
-│   ├── logs/             # Loki query proxy + WS stream to dashboard
-│   ├── monitoring/       # PromQL queries, alert webhook receiver
-│   └── notifications/    # email, telegram, generic webhook
+│   ├── projects/         # GitHub URL, build config, appPort
+│   ├── environments/     # dev / stage / prod per project
+│   ├── env-vars/         # encrypted, versioned, scoped
+│   ├── deployments/      # state machine + BullMQ + blue-green
+│   ├── databases/        # PG/Redis container provisioning
+│   ├── domains/          # Cloudflare DNS + Caddy routes
+│   ├── logs/             # Loki proxy + WS stream
+│   ├── monitoring/       # PromQL + alert webhook
+│   └── notifications/    # email, telegram, webhook
 │
 ├── infrastructure/
-│   ├── persistence/      # Drizzle schemas, db client, PersistenceModule
-│   ├── docker/           # dockerode wrapper (containers, networks, volumes)
-│   ├── caddy/            # Caddy admin API client (PATCH config blocks)
-│   ├── cloudflare/       # Cloudflare API client (zones, DNS records)
-│   ├── git/              # simple-git wrapper (clone, fetch, checkout)
-│   ├── queue/            # BullMQ setup, job registration
-│   ├── messaging/        # amqplib wrapper, publishers, consumers
-│   └── loki/             # log push (Promtail-compatible), query API
+│   ├── persistence/      # Drizzle schemas + PersistenceModule
+│   ├── docker/           # dockerode wrapper
+│   ├── caddy/            # Caddy admin API client
+│   ├── cloudflare/       # Cloudflare DNS client
+│   ├── git/              # simple-git wrapper
+│   ├── queue/            # BullMQ + ioredis (@Global)
+│   ├── messaging/        # amqplib wrapper
+│   └── loki/             # log push + query
 │
-└── shared/               # DTO base, exceptions, pipes, decorators, utils
-    └── pipes/zod-validation.pipe.ts
+└── shared/
+    ├── exceptions/       # AppException hierarchy + HttpExceptionFilter
+    └── pipes/            # ZodValidationPipe
 ```
 
-`@Global()` modules: `ConfigModule`, `PersistenceModule`, `CryptoModule`, `AuditModule`. Everything else imports what it needs explicitly.
+`@Global()`: `ConfigModule`, `PersistenceModule`, `CryptoModule`, `AuditModule`, `QueueModule`.
 
-## Key design decisions and rationale
+## Key design decisions
 
-### Deployments are state machines, run by BullMQ
-Every deployment is a row in `deployments` with `status: pending | cloning | building | starting | health_check | switching | success | failed | rolled_back`. A BullMQ worker processes it. Each step is **idempotent** — retrying after a crash must not double-create resources. Each step that creates state has a corresponding compensation step for rollback.
+### Deployments — state machine via BullMQ
+States: `pending → cloning → building → starting → health_check → switching → success | failed | rolled_back`.
+Each step is idempotent — retry after crash must not double-create resources. Each creating step has a compensation step for rollback.
 
-### Zero-downtime deploys = manual blue-green
-For each project the running container is `app_<id>_blue`. New deploy creates `app_<id>_green`. After `green` passes health checks, NestJS PATCHes Caddy's `reverse_proxy` upstream to point at `green`, waits for in-flight requests to drain, then stops `blue`. On next deploy the colors swap. No Swarm, no Kubernetes.
+### Zero-downtime = blue-green
+Running container: `app_<id>_blue`. New deploy creates `app_<id>_green`. After health check, NestJS PATCHes Caddy upstream (`caddy.updateUpstream(routeId, ip:port)`), then stops blue. Colors swap on next deploy.
 
-### Secrets use envelope encryption
-Per-secret Data Encryption Key (DEK), generated randomly. The DEK is encrypted with a master key (from env, ideally backed by an HSM/KMS later). Cipher: AES-256-GCM. Stored fields per secret: `ciphertext`, `encrypted_dek`, `iv`, `auth_tag`, `key_version`. Plaintext is decrypted only at the moment the value is shipped to a container or revealed in the dashboard (with a separate confirmation step). The dashboard never holds plaintext in normal browsing.
+### Secrets — envelope encryption
+Per-secret DEK encrypted with master key. Cipher: AES-256-GCM. Fields: `ciphertext`, `encrypted_dek`, `iv`, `auth_tag`, `key_version`. Plaintext decrypted only at reveal or container inject — never held in memory during normal browsing.
 
-### Env vars are secrets with extras
-They reuse the crypto layer. On top: versioning (every change = new row, old rows kept), per-environment scope (project → env → key), and a sync trigger that PATCHes the running container's environment via Docker API and restarts (blue-green if zero-downtime is requested, simple restart otherwise).
+### Audit DB — separate Postgres, INSERT-only
+`control_plane_audit` DB, connection role has INSERT only on `audit_events`. Main app role has no access. Survives app DB compromise.
 
-### Audit log on a separate database with insert-only role
-A second Postgres DB `control_plane_audit`. The connection string the app uses for audit writes points to a role that has `INSERT` only on `audit_events`. No `UPDATE`, no `DELETE`. The main app's regular DB role has no access to that DB at all. This survives an attacker who compromises the app DB.
+### Migrations — separate job in production
+Dev: `pnpm db:generate && pnpm db:migrate`. Production: short-lived container runs `drizzle-kit migrate` before app container starts.
 
-Audit row shape (minimum): `id`, `actor_user_id`, `action` (e.g. `secret.reveal`, `project.delete`), `resource_type`, `resource_id`, `metadata` (jsonb, no plaintext secrets), `ip`, `user_agent`, `created_at`. `created_at` is `DEFAULT now()`, immutable.
+### REST + WebSocket
+REST under `/api/*` for CRUD. WebSocket gateways for: live deploy status, live log tail (Loki streaming), live metrics. WS auth via session cookie.
 
-### Migrations are a separate job in production
-Dev: `pnpm db:generate` then `pnpm db:migrate`. CI checks the diff. Production: a dedicated short-lived container (or systemd one-shot) runs `drizzle-kit migrate` against both DBs **before** the app container starts. The app's `depends_on` waits for the migration job to exit successfully.
-
-### REST for CRUD, WebSocket for streams
-REST endpoints under `/api/*` for everything that returns once. WebSocket gateways (`@nestjs/platform-ws` or `socket.io`) for: live deploy status, live log tail (Loki has a streaming query API — proxy that), live metric streams. Auth on WS upgrades by reading the same session cookie.
-
-### Configuration uses zod, not @nestjs/config defaults
-`ConfigModule` parses `process.env` against `envSchema` at startup. On failure it logs a formatted error and `process.exit(1)`. `ConfigService.get('SOMETHING')` is fully typed.
-
-### OpenTelemetry from day one
-`@opentelemetry/sdk-node` initialized in `src/tracing.ts`, imported as the very first line of `main.ts`. Instruments HTTP, Postgres, Redis, AMQP, ioredis. Exports OTLP to a local collector.
+### Config — Zod only
+`envSchema.safeParse(process.env)` at startup. On failure: log + `process.exit(1)`. `ConfigService.get('KEY')` is fully typed.
 
 ## Coding conventions
 
-- File naming: `kebab-case.ts`. Class names: `PascalCase`. One class per file when reasonable.
-- Modules expose only what they want consumed. No deep imports across modules — go through the module's public service.
-- Repositories live under `infrastructure/persistence` only when they wrap non-trivial queries. For simple CRUD, just inject `DB_TOKEN` and use Drizzle directly inside the service.
-- DTOs are zod schemas. The schema is the source of truth; the TS type is `z.infer<typeof schema>`. Validation happens via the shared `ZodValidationPipe`.
-- All async ops that touch external systems (Docker, Caddy, Cloudflare, RabbitMQ) go through their `infrastructure/*` wrapper. Domain modules never import `dockerode`, `axios`, etc. directly.
-- Background work that can be retried = BullMQ job. One-shot fire-and-forget event = RabbitMQ publish.
-- Idempotency keys on all mutating jobs.
-- Errors: throw typed exceptions from `shared/exceptions`. A global filter maps them to HTTP responses. No raw `throw new Error('...')` in controllers/services.
+- Files: `kebab-case.ts`. Classes: `PascalCase`. One class per file when reasonable.
+- No deep cross-module imports — go through the module's exported service.
+- Simple CRUD: inject `DB_TOKEN`, use Drizzle directly in the service. No repository wrapper unless query is non-trivial.
+- DTOs: zod schema + `z.infer<typeof schema>`. Validated via `ZodValidationPipe`.
+- External systems (Docker, Caddy, Cloudflare, RabbitMQ): always via `infrastructure/*` wrapper. Domain modules never import `dockerode`, `axios`, etc.
+- Retryable background work → BullMQ. Fire-and-forget event → RabbitMQ publish.
+- Idempotency keys on all mutating BullMQ jobs.
+- Errors: throw from `shared/exceptions`. No raw `throw new Error(...)` in controllers/services.
 
 ## Security non-negotiables
 
-- Docker socket access = root-equivalent. Document it. NestJS container has minimal mounts otherwise.
-- Cookies: `httpOnly`, `secure` in production, `sameSite: 'strict'`, signed with `SESSION_SECRET` (≥32 bytes, random).
+- Docker socket = root-equivalent. NestJS container has minimal mounts otherwise.
+- Cookies: `httpOnly`, `secure` in prod, `sameSite: 'strict'`, signed with `SESSION_SECRET` (≥32 bytes).
 - Session fixation: `req.session.regenerate()` on login.
-- CSRF: SameSite=strict cookies handle most cases for our single-origin dashboard. If we ever add cross-origin clients, add CSRF tokens.
-- Helmet enabled. CORS whitelisted to the dashboard origin only.
-- Argon2id with sane defaults (`type: argon2id`, default memory/time costs are fine for our scale).
-- Rate-limit `/api/auth/login` (BullMQ-backed throttle keyed on IP + email). Brute-force lockout after N failures.
-- Secrets never appear in logs. A redacting log formatter strips known sensitive keys (`password`, `token`, `secret`, `key`).
-- `helmet`, `cookie-parser`, `express-session` order matters — see `main.ts`.
+- CSRF: SameSite=strict handles single-origin. Add tokens if ever cross-origin.
+- Argon2id defaults are fine for our scale.
+- Rate-limit `POST /api/auth/login` (IP + email keyed, BullMQ throttle).
+- Secrets never appear in logs — redacting formatter strips `password`, `token`, `secret`, `key`, `apiKey`, `auth`.
+- Middleware order in `main.ts`: `helmet` → `cookie-parser` → `express-session`.
 
-## Out of scope for now
+## Out of scope
 
-Don't propose any of these unless I explicitly ask:
+Don't propose unless explicitly asked:
 
 - Multi-tenancy, workspaces, organizations
 - Multi-user / RBAC / SSO / OIDC
@@ -188,63 +231,78 @@ Don't propose any of these unless I explicitly ask:
 - Kubernetes, Docker Swarm, Nomad
 - TypeORM, Prisma, Sequelize
 - JWT for browser sessions
-- GraphQL
-- Microservices split
+- GraphQL, microservices split
 - class-validator / class-transformer
 
 ## Current implementation status
 
-✅ **Completed (Phase 1 - Core Foundation):**
-- Project skeleton (NestJS + pnpm)
-- `ConfigModule` with zod-validated env
-- `PersistenceModule` with Drizzle, dual DB setup
-- `AuthModule` with login/logout/me, session in Redis, argon2id, admin bootstrap
-- `CryptoModule` with AES-256-GCM envelope encryption
-- `AuditModule` with separate DB, INSERT-only role, log sanitization
-- `docker-compose.dev.yml` for local Postgres + Redis
-- Initial migrations for users and audit tables
+✅ **Phase 1 — Foundation**
+- ConfigModule (zod env), PersistenceModule (Drizzle, dual DB)
+- AuthModule (login/logout/me, argon2id, session fixation, admin bootstrap)
+- CryptoModule (AES-256-GCM envelope encryption)
+- AuditModule (separate DB, INSERT-only, metadata sanitization)
+- `shared/exceptions` (AppException hierarchy + HttpExceptionFilter)
+- `main.ts` (helmet, cookie-parser, express-session+connect-redis, `/api` prefix)
+- `docker-compose.dev.yml`, migrations (main + audit)
 
-🚧 **Next planned modules (Phase 2 - Project Management):**
-1. `projects` + `environments` + `env-vars` (encrypted secrets, versioning)
-2. `infrastructure/docker` + `infrastructure/git` (container + repo management)
+✅ **Phase 2 — Project Management**
+- ProjectsModule (CRUD + audit, `appPort` field)
+- EnvironmentsModule (CRUD, per-project scoping)
+- EnvVarsModule (envelope-encrypted, versioned, reveal endpoint)
 
-**Phase 3 - Deployment Pipeline:**
-3. `deployments` (state machine + BullMQ, blue-green orchestration)
-4. `infrastructure/caddy` + `domains` + `infrastructure/cloudflare` (reverse proxy + DNS)
+✅ **Phase 3 — Deployment Pipeline**
+- `infrastructure/git` — GitService (clone/fetch/reset via simple-git)
+- `infrastructure/docker` — DockerService (idempotent build/create/start/stop)
+- `infrastructure/queue` — QueueModule @Global (BullMQ + ioredis)
+- DeploymentsModule — full state machine, BullMQ worker, blue-green logic
 
-**Phase 4 - Infrastructure Services:**
-5. `databases` (PG/Redis provisioning, user/password management)
-6. `logs` (Loki integration, WS streaming)
-7. `monitoring` (Prometheus, alert webhook)
+✅ **Phase 4 — Infrastructure Services**
+- `infrastructure/caddy` — CaddyService (upsertRoute, updateUpstream, deleteRoute)
+- `infrastructure/cloudflare` — CloudflareService (createARecord, deleteRecord)
+- DomainsModule — Cloudflare DNS + Caddy route on domain create/delete
+- DatabasesModule — PG/Redis Docker provisioning, encrypted credentials, connection string
 
-**Phase 5 - Production Ready:**
-8. OpenTelemetry wiring, performance optimization
-9. Production Dockerfile + compose, migration job, backups
+✅ **Phase 5 — Observability**
+- `src/tracing.ts` — NodeSDK + OTLPTraceExporter (gRPC) + 5 instrumentations, first import in main.ts
+- `infrastructure/loki` — LokiService: push + queryRange
+- `modules/logs` — REST query + WebSocket live tail (WsAdapter, 2s Loki poll)
+- `modules/monitoring` — PromQL proxy (instant + range), alert webhook (no auth)
 
-## Git Workflow
+✅ **VCS Module**
+- `modules/vcs` — GitHub (HMAC-SHA256) + GitLab (token) webhook receivers
+- Auto-deploy on push to `project.branch` → all environments (deployedById=null)
+- `GET /vcs/:id/branches`, `POST/DELETE /vcs/:id/webhook-secret`
+- projects schema: 5 webhook_secret_* columns (envelope-encrypted), migration 0002
 
-**Per-phase commits:** Each major module/phase gets committed separately with descriptive messages following pattern: `feat: implement <module-name> - <brief-description>`
+✅ **Phase 6 — Production + Notifications**
+- `infrastructure/messaging` — MessagingService: RabbitMQ lazy connect, publish + subscribe
+- `modules/notifications` — email (nodemailer) + Telegram + webhook; event-driven via RabbitMQ `deployment.*` routing key
+- `Dockerfile` — 3-stage multi-stage, postgresql16-client, non-root `app` user
+- `docker-compose.prod.yml` — postgres + postgres-audit + redis + rabbitmq + migrate job + app + caddy
+- `modules/backup` — pg_dump | gzip, `/data/backups/`, REST: POST /backup/trigger, GET /backup, DELETE /backup/:name
+- `modules/grafana` — GET /grafana/config + /grafana/panel for iframe embedding
+- Rate limiting — Redis INCR on login (5 / 15 min / IP+email), `TooManyRequestsException` (429)
+- env schema: SMTP_*, TELEGRAM_*, NOTIFICATION_WEBHOOK_URL, SERVER_IP, GRAFANA_*
 
-**Commit strategy:**
-- Atomic commits per logical feature
-- Test build success before commit
-- Include audit trail in commit metadata
-- Push after each phase completion
+**PROJECT COMPLETE** — all MVP features implemented, tsc --noEmit exit 0
 
-## Obsidian Wiki
+## Git workflow
 
-Shared knowledge base: `~/Documents/claude-node/`
+`feat: implement <module> - <brief description>` per phase. Build must pass before commit.
 
-- Entity page: `[[entities/control-plane]]` — update when architecture changes
-- Memory dir: `~/Documents/claude-node/memory/`
-- Link to: `[[entities/NestJS]]`, `[[entities/PostgreSQL]]`, `[[entities/BullMQ]]`, `[[entities/Redis]]`, `[[entities/Docker]]`
+## Obsidian wiki
+
+- Entity: `[[entities/control-plane]]` — update on architecture changes
+- Tasks: `[[tasks/phase-4-infra-services]]`, create new task page per phase
+- Log: `wiki/log.md` — every major change
+- Memory: `~/Documents/claude-node/memory/project_control-plane-status.md`
+- Links: `[[entities/NestJS]]`, `[[entities/PostgreSQL]]`, `[[entities/BullMQ]]`, `[[entities/Redis]]`, `[[entities/Docker]]`
 - Concepts: `[[concepts/Blue-Green-Deployment]]`, `[[concepts/Envelope-Encryption]]`, `[[concepts/State-Machine]]`
 
-## How to work with me on this project
+## How to work with me
 
-- I prefer line-by-line implementation instructions, not large dumps. Say "in `auth.service.ts`, replace lines X–Y with…" rather than rewriting whole files when an edit is small.
-- Don't generate many `.md` or `.sh` files. One file per real need.
-- Don't use artifacts for code unless I ask. Inline code blocks are fine.
-- Always state your uncertainty as `Uncertainty: <0..1>` at the top of your reply. If > 0.05, ask clarifying questions before answering.
-- I write in Uzbek; reply in Uzbek for explanations, keep code/identifiers in English.
-- When proposing a change, briefly say what it does and why before showing code. Keep the prose tight.
+- Reply in Uzbek for explanations; code/identifiers in English.
+- `Uncertainty: <0..1>` at the top of every reply. If > 0.05, ask before implementing.
+- Prefer line-by-line edits over full-file rewrites when the change is small.
+- No `.md` or `.sh` files unless there's a real need.
+- No artifacts unless asked — inline code blocks are fine.
