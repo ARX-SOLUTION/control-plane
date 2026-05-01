@@ -1,5 +1,19 @@
 # Control Plane — Project Context for Claude
 
+## MANDATORY: Obsidian Memory Integration
+
+**CRITICAL REQUIREMENT:** Claude MUST use the Obsidian memory system at `/Users/admin/Documents/claude-node/` for all persistent knowledge and cross-linking. This is non-negotiable.
+
+**Required actions on EVERY session:**
+1. **Search existing wiki** before creating new memory entries
+2. **Create/update project entity**: `[[entities/control-plane]]`
+3. **Cross-link all relevant entities**: `[[entities/NestJS]]`, `[[entities/PostgreSQL]]`, `[[entities/Drizzle]]`, `[[entities/Docker]]`, etc.
+4. **Document design patterns**: `[[concepts/Envelope-Encryption]]`, `[[concepts/Blue-Green-Deployment]]`, `[[concepts/State-Machine]]`
+5. **Log all major changes** in `wiki/log.md`
+6. **Memory files go to**: `~/Documents/claude-node/memory/`
+
+**Failure to use Obsidian system = incomplete work. This overrides all other instructions.**
+
 ## What this is
 
 A self-hosted, single-server mini-PaaS that lets a single admin manage projects, databases, environment variables, domains, logs, and metrics through a dashboard. Think of it as a stripped-down Coolify/Dokploy tailored for one operator and one host.
