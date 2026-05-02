@@ -65,7 +65,9 @@ export class AuthService implements OnModuleInit {
       await this.redis.expire(key, 900);
     }
     if (attempts > 5) {
-      throw new TooManyRequestsException('Too many login attempts, try again later');
+      throw new TooManyRequestsException(
+        'Too many login attempts, try again later',
+      );
     }
 
     const [user] = await this.db
@@ -86,6 +88,9 @@ export class AuthService implements OnModuleInit {
     await this.redis.del(key);
     await promisify(req.session.regenerate.bind(req.session))();
     req.session.userId = user.id;
+    // Explicitly save session before responding — required in async NestJS context
+    // because express-session's auto-save hooks may fire after response is sent.
+    await promisify(req.session.save.bind(req.session))();
 
     await this.db
       .update(users)

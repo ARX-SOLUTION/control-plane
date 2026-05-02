@@ -6,7 +6,11 @@ export class ConfigService {
   private readonly config: EnvConfig;
 
   constructor() {
-    const result = envSchema.safeParse(process.env);
+    const normalizedEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([, value]) => value !== ''),
+    );
+
+    const result = envSchema.safeParse(normalizedEnv);
 
     if (!result.success) {
       console.error('❌ Invalid environment variables:');

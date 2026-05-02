@@ -1,0 +1,8 @@
+version: '3.9'
+
+# Port 5432 band bo'lsa (tizim PostgreSQL), bu file orqali 5433 dan ishlating:
+# docker compose -f docker-compose.dev.yml -f docker-compose.local.yml up -d
+services:
+  postgres:
+    ports:
+      - '5433:5432'

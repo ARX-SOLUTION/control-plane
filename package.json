@@ -48,7 +48,7 @@
     "amqplib": "^1.0.3",
     "argon2": "^0.44.0",
     "bullmq": "^5.76.4",
-    "connect-redis": "^9.0.0",
+    "connect-redis": "^8.1.0",
     "cookie-parser": "^1.4.7",
     "dockerode": "^5.0.0",
     "drizzle-orm": "^0.45.2",

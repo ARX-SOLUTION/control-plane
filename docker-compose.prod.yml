@@ -105,8 +105,10 @@ services:
       - '80:80'
       - '443:443'
       - '2019:2019'
+    env_file: .env.prod
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../frontend/dist:/srv/frontend:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

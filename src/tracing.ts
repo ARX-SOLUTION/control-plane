@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { tracing } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
