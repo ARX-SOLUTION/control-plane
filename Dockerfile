@@ -17,7 +17,7 @@ COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/migrations-audit ./migrations-audit
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder /app/drizzle.config.audit.ts ./drizzle.config.audit.ts
-RUN apk add --no-cache postgresql16-client git
+RUN apk add --no-cache postgresql16-client git docker-cli
 RUN addgroup -S app && adduser -S app -G app
 RUN mkdir -p /data/repos /data/backups && chown -R app:app /data
 USER app
