@@ -99,23 +99,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - '80:80'
-      - '443:443'
-      - '2019:2019'
-    env_file: .env.prod
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../frontend/dist:/srv/frontend:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - cp_internal
-      - cp_ingress
-    restart: unless-stopped
-
 networks:
   cp_internal:
     internal: true
@@ -126,5 +109,3 @@ volumes:
   pgdata-audit:
   redisdata:
   rabbitmqdata:
-  caddy_data:
-  caddy_config:
