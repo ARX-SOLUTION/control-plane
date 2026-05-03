@@ -6,7 +6,11 @@ export class CaddyService {
   private readonly logger = new Logger(CaddyService.name);
   private readonly baseUrl: string;
 
-  private readonly headers = { 'Content-Type': 'application/json', Host: 'localhost' };
+  private readonly headers = {
+    'Content-Type': 'application/json',
+    Host: 'localhost:2019',
+    Origin: 'http://localhost:2019',
+  };
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get('CADDY_ADMIN_URL');
