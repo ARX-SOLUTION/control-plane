@@ -19,6 +19,7 @@ COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder /app/drizzle.config.audit.ts ./drizzle.config.audit.ts
 RUN apk add --no-cache postgresql16-client
 RUN addgroup -S app && adduser -S app -G app
+RUN mkdir -p /data/repos /data/backups && chown -R app:app /data
 USER app
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]
