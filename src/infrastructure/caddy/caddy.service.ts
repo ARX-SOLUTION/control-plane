@@ -6,6 +6,8 @@ export class CaddyService {
   private readonly logger = new Logger(CaddyService.name);
   private readonly baseUrl: string;
 
+  private readonly headers = { 'Content-Type': 'application/json', Host: 'localhost' };
+
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get('CADDY_ADMIN_URL');
   }
@@ -19,7 +21,7 @@ export class CaddyService {
       `${this.baseUrl}/config/apps/http/servers/cp/routes/...`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.headers,
         body: JSON.stringify(route),
       },
     );
@@ -32,7 +34,7 @@ export class CaddyService {
 
   async getRouteUpstream(routeId: string): Promise<string | null> {
     try {
-      const res = await fetch(`${this.baseUrl}/id/${routeId}`);
+      const res = await fetch(`${this.baseUrl}/id/${routeId}`, { headers: this.headers });
       if (!res.ok) return null;
       const data = await res.json() as any;
       return data?.handle?.[0]?.upstreams?.[0]?.dial ?? null;
@@ -45,7 +47,7 @@ export class CaddyService {
     const upstreams = [{ dial: upstream }];
     const res = await fetch(`${this.baseUrl}/id/${routeId}/handle/0/upstreams`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify(upstreams),
     });
 
@@ -59,6 +61,7 @@ export class CaddyService {
   async deleteRoute(routeId: string): Promise<void> {
     const res = await fetch(`${this.baseUrl}/id/${routeId}`, {
       method: 'DELETE',
+      headers: this.headers,
     });
 
     if (!res.ok && res.status !== 404) {
@@ -68,7 +71,7 @@ export class CaddyService {
   }
 
   async routeExists(routeId: string): Promise<boolean> {
-    const res = await fetch(`${this.baseUrl}/id/${routeId}`);
+    const res = await fetch(`${this.baseUrl}/id/${routeId}`, { headers: this.headers });
     return res.ok;
   }
 
