@@ -44,6 +44,9 @@ export class DatabasesService {
     const username = dto.type === 'postgres' ? dto.name : undefined;
     const port = dto.type === 'postgres' ? PG_PORT : REDIS_PORT;
 
+    // Ensure project network exists (may not exist if no deployment yet)
+    await this.docker.ensureNetwork(networkName);
+
     // Provision container
     if (dto.type === 'postgres') {
       await this.provisionPostgres(containerName, dto.name, username!, password, networkName);

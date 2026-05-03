@@ -108,6 +108,16 @@ export class DockerService {
       .catch(() => {});
   }
 
+  async ensureNetwork(networkName: string): Promise<void> {
+    const networks = await this.docker.listNetworks({
+      filters: JSON.stringify({ name: [networkName] }),
+    });
+    const exact = networks.find((n) => n.Name === networkName);
+    if (!exact) {
+      await this.docker.createNetwork({ Name: networkName, Driver: 'bridge' });
+    }
+  }
+
   async isContainerRunning(containerName: string): Promise<boolean> {
     const containers = await this.docker.listContainers({
       filters: JSON.stringify({ name: [`^/${containerName}$`] }),
