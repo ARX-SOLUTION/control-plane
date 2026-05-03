@@ -21,8 +21,9 @@ export class CaddyService {
 
     await this.deleteRoute(routeId).catch(() => {});
 
+    const serverName = await this.getServerName();
     const res = await fetch(
-      `${this.baseUrl}/config/apps/http/servers/cp/routes/...`,
+      `${this.baseUrl}/config/apps/http/servers/${serverName}/routes/...`,
       {
         method: 'POST',
         headers: this.headers,
@@ -77,6 +78,17 @@ export class CaddyService {
   async routeExists(routeId: string): Promise<boolean> {
     const res = await fetch(`${this.baseUrl}/id/${routeId}`, { headers: this.headers });
     return res.ok;
+  }
+
+  private async getServerName(): Promise<string> {
+    try {
+      const res = await fetch(`${this.baseUrl}/config/apps/http/servers/`, { headers: this.headers });
+      if (!res.ok) return 'srv0';
+      const data = await res.json() as Record<string, unknown>;
+      return Object.keys(data)[0] ?? 'srv0';
+    } catch {
+      return 'srv0';
+    }
   }
 
   private buildRoute(routeId: string, domains: string[], upstream: string) {
