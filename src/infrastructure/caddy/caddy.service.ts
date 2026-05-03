@@ -10,14 +10,9 @@ export class CaddyService {
     this.baseUrl = this.configService.get('CADDY_ADMIN_URL');
   }
 
-  // Add or replace a reverse_proxy route for an environment.
-  // routeId: e.g. "route_env_<envId>"
-  // domain: "example.com"
-  // upstream: "ip:port"
-  async upsertRoute(routeId: string, domain: string, upstream: string): Promise<void> {
-    const route = this.buildRoute(routeId, domain, upstream);
+  async upsertRoute(routeId: string, domains: string[], upstream: string): Promise<void> {
+    const route = this.buildRoute(routeId, domains, upstream);
 
-    // Try DELETE first (idempotent) then POST
     await this.deleteRoute(routeId).catch(() => {});
 
     const res = await fetch(
@@ -35,7 +30,17 @@ export class CaddyService {
     }
   }
 
-  // Update only the upstream of an existing route (used during blue-green switch).
+  async getRouteUpstream(routeId: string): Promise<string | null> {
+    try {
+      const res = await fetch(`${this.baseUrl}/id/${routeId}`);
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      return data?.handle?.[0]?.upstreams?.[0]?.dial ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async updateUpstream(routeId: string, upstream: string): Promise<void> {
     const upstreams = [{ dial: upstream }];
     const res = await fetch(`${this.baseUrl}/id/${routeId}/handle/0/upstreams`, {
@@ -67,10 +72,10 @@ export class CaddyService {
     return res.ok;
   }
 
-  private buildRoute(routeId: string, domain: string, upstream: string) {
+  private buildRoute(routeId: string, domains: string[], upstream: string) {
     return {
       '@id': routeId,
-      match: [{ host: [domain] }],
+      match: [{ host: domains }],
       handle: [
         {
           handler: 'reverse_proxy',

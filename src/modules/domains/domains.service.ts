@@ -22,29 +22,17 @@ export class DomainsService {
 
   async create(dto: CreateDomainDto, userId: string) {
     let cloudflareRecordId: string | undefined;
-    const zoneId = dto.cloudflareZoneId;
 
-    // Create Cloudflare DNS record if serverIp provided
     if (dto.serverIp) {
       try {
         cloudflareRecordId = await this.cloudflareService.createARecord(
           dto.domain,
           dto.serverIp,
-          zoneId,
+          dto.cloudflareZoneId,
         );
       } catch (err) {
         this.logger.warn(`Cloudflare DNS creation failed: ${(err as Error).message}`);
       }
-    }
-
-    // Add Caddy route for this environment
-    const routeId = `route_env_${dto.environmentId}`;
-    try {
-      // Upstream will be set when a deployment completes (updateUpstream in processor)
-      // For now add a placeholder route so the ID is registered
-      await this.caddyService.upsertRoute(routeId, dto.domain, '127.0.0.1:3000');
-    } catch (err) {
-      this.logger.warn(`Caddy route creation failed: ${(err as Error).message}`);
     }
 
     const [domain] = await this.db
@@ -52,10 +40,12 @@ export class DomainsService {
       .values({
         environmentId: dto.environmentId,
         domain: dto.domain,
-        cloudflareZoneId: zoneId ?? null,
+        cloudflareZoneId: dto.cloudflareZoneId ?? null,
         cloudflareRecordId: cloudflareRecordId ?? null,
       })
       .returning();
+
+    await this.syncCaddyRoute(dto.environmentId);
 
     this.auditService.log({
       actor_user_id: userId,
@@ -92,7 +82,6 @@ export class DomainsService {
   async delete(id: string, userId: string): Promise<void> {
     const domain = await this.findOne(id);
 
-    // Remove Cloudflare record
     if (domain.cloudflareRecordId) {
       try {
         await this.cloudflareService.deleteRecord(
@@ -104,15 +93,9 @@ export class DomainsService {
       }
     }
 
-    // Remove Caddy route
-    const routeId = `route_env_${domain.environmentId}`;
-    try {
-      await this.caddyService.deleteRoute(routeId);
-    } catch (err) {
-      this.logger.warn(`Caddy route delete failed: ${(err as Error).message}`);
-    }
-
     await this.db.delete(domains).where(eq(domains.id, id));
+
+    await this.syncCaddyRoute(domain.environmentId);
 
     this.auditService.log({
       actor_user_id: userId,
@@ -121,5 +104,30 @@ export class DomainsService {
       resource_id: id,
       metadata: { domain: domain.domain },
     });
+  }
+
+  private async syncCaddyRoute(environmentId: string): Promise<void> {
+    const routeId = `route_env_${environmentId}`;
+    const envDomains = await this.db
+      .select()
+      .from(domains)
+      .where(eq(domains.environmentId, environmentId));
+
+    if (envDomains.length === 0) {
+      await this.caddyService.deleteRoute(routeId).catch((err) => {
+        this.logger.warn(`Caddy deleteRoute failed: ${(err as Error).message}`);
+      });
+      return;
+    }
+
+    const upstream =
+      (await this.caddyService.getRouteUpstream(routeId)) ?? '127.0.0.1:9999';
+
+    const domainNames = envDomains.map((d) => d.domain);
+    try {
+      await this.caddyService.upsertRoute(routeId, domainNames, upstream);
+    } catch (err) {
+      this.logger.warn(`Caddy syncCaddyRoute failed: ${(err as Error).message}`);
+    }
   }
 }
