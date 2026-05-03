@@ -16,6 +16,7 @@ import {
 import { GitService } from '@/infrastructure/git/git.service';
 import { DockerService } from '@/infrastructure/docker/docker.service';
 import { CaddyService } from '@/infrastructure/caddy/caddy.service';
+import { ConfigService } from '@/core/config';
 import { EnvVarsService } from '../env-vars/env-vars.service';
 import { DeploymentsService } from './deployments.service';
 import { MessagingService } from '@/infrastructure/messaging';
@@ -36,6 +37,7 @@ export class DeploymentProcessor {
     @Inject(DB_TOKEN) private readonly db: PostgresJsDatabase,
     @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis,
     private readonly messaging: MessagingService,
+    private readonly configService: ConfigService,
   ) {
     this.worker = new Worker<DeploymentJobData>(
       DEPLOYMENT_QUEUE_NAME,
@@ -109,7 +111,7 @@ export class DeploymentProcessor {
       imageName,
       containerName: newName,
       envVars: varMap,
-      networkName: 'cp_ingress',
+      networkName: this.configService.get('INGRESS_NETWORK'),
     });
     await this.docker.startContainer(containerId);
 
@@ -117,7 +119,7 @@ export class DeploymentProcessor {
     await this.svc.updateStatus(deploymentId, 'health_check', {
       containerName: newName,
     });
-    const ip = await this.docker.getContainerInternalIp(newName, 'cp_ingress');
+    const ip = await this.docker.getContainerInternalIp(newName, this.configService.get('INGRESS_NETWORK'));
     const healthPath = project.healthCheckPath ?? '/';
     const healthInterval = project.healthCheckInterval ?? 30;
     await this.pollHealth(`http://${ip}${healthPath}`, healthInterval);

@@ -31,6 +31,7 @@ export const envSchema = z.object({
 
   // Docker
   DOCKER_SOCKET_PATH: z.string().default('/var/run/docker.sock'),
+  INGRESS_NETWORK: z.string().default('cp_ingress'),
 
   // Caddy
   CADDY_ADMIN_URL: z.string().url().default('http://localhost:2019'),

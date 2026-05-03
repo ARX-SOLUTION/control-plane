@@ -16,6 +16,7 @@ import { CaddyModule } from '@/infrastructure/caddy/caddy.module';
 import { CaddyService } from '@/infrastructure/caddy/caddy.service';
 import { MessagingModule } from '@/infrastructure/messaging/messaging.module';
 import { MessagingService } from '@/infrastructure/messaging';
+import { ConfigService } from '@/core/config';
 import { EnvironmentsModule } from '../environments/environments.module';
 import { EnvVarsModule } from '../env-vars/env-vars.module';
 import { DeploymentsController } from './deployments.controller';
@@ -39,6 +40,7 @@ import { EnvVarsService } from '../env-vars/env-vars.service';
         DB_TOKEN,
         REDIS_CLIENT_TOKEN,
         MessagingService,
+        ConfigService,
       ],
       useFactory: (
         svc: DeploymentsService,
@@ -49,7 +51,8 @@ import { EnvVarsService } from '../env-vars/env-vars.service';
         db: any,
         redis: any,
         messaging: MessagingService,
-      ) => new DeploymentProcessor(svc, git, caddy, docker, envVars, db, redis, messaging),
+        config: ConfigService,
+      ) => new DeploymentProcessor(svc, git, caddy, docker, envVars, db, redis, messaging, config),
     },
   ],
   exports: [DeploymentsService],
