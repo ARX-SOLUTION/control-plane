@@ -23,7 +23,9 @@
     "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
     "db:migrate:audit": "drizzle-kit migrate --config drizzle.config.audit.ts",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
-    "db:studio:audit": "drizzle-kit studio --config drizzle.config.audit.ts"
+    "db:studio:audit": "drizzle-kit studio --config drizzle.config.audit.ts",
+    "docs:dev": "cd docs && npm install && npm run dev",
+    "docs:build": "cd docs && npm install && npm run build"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
