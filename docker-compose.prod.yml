@@ -89,6 +89,8 @@ services:
     env_file: .env.prod
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-112}"
     networks:
       - cp_internal
       - cp_ingress
